@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+
+{% block title %}Alerts - FIM System{% endblock %}
+
+{% block extra_head %}
+<style>
+    .webhook-url {
+        word-break: break-all;
+        font-family: monospace;
+        font-size: 0.875rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Alert Configuration</h1>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="alert alert-info">
+            <strong>Webhook Alerts</strong> - Configure webhooks to receive real-time alerts when file changes are detected. 
+            Supports n8n.io, Zapier, custom webhooks, and direct Telegram notifications.
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">Add New Webhook</h5>
+            </div>
+            <div class="card-body">
+                <form id="webhookForm">
+                    <input type="hidden" name="config_id" id="configId" value="">
+                    
+                    <div class="mb-3">
+                        <label for="webhookName" class="form-label">Name</label>
+                        <input type="text" class="form-control" id="webhookName" name="name" 
+                               placeholder="e.g., n8n Production, Telegram Alerts" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="webhookUrl" class="form-label">Webhook URL</label>
+                        <input type="url" class="form-control" id="webhookUrl" name="webhook_url" 
+                               placeholder="https://your-n8n-instance.com/webhook/..." required>
+                        <div class="form-text">For n8n, use the production webhook URL from your workflow</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Alert on Event Types:</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="alertCreated" name="alert_on_created" checked>
+                            <label class="form-check-label" for="alertCreated">Created</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="alertModified" name="alert_on_modified" checked>
+                            <label class="form-check-label" for="alertModified">Modified</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="alertDeleted" name="alert_on_deleted" checked>
+                            <label class="form-check-label" for="alertDeleted">Deleted</label>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="minClassification" class="form-label">Minimum Classification Level</label>
+                        <select class="form-select" id="minClassification" name="min_classification">
+                            <option value="Unclassified">Unclassified (All files)</option>
+                            <option value="Confidential">Confidential and above</option>
+                            <option value="Secret">Secret and above</option>
+                            <option value="Top Secret">Top Secret only</option>
+                        </select>
+                        <div class="form-text">Only send alerts for files at or above this classification</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="isActive" name="is_active" checked>
+                            <label class="form-check-label" for="isActive">Active</label>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">Save Configuration</button>
+                        <button type="button" class="btn btn-secondary" onclick="resetForm()">Reset</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">Configured Webhooks</h5>
+            </div>
+            <div class="card-body p-0">
+                {% if configs %}
+                <div class="list-group list-group-flush">
+                    {% for config in configs %}
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1">
+                                    {{ config.name }}
+                                    {% if config.is_active %}
+                                    <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Inactive</span>
+                                    {% endif %}
+                                </h6>
+                                <p class="mb-1 webhook-url text-muted">{{ config.webhook_url[:50] }}...</p>
+                                <small class="text-muted">
+                                    Events: 
+                                    {% if config.alert_on_created %}<span class="badge bg-success">Created</span>{% endif %}
+                                    {% if config.alert_on_modified %}<span class="badge bg-warning text-dark">Modified</span>{% endif %}
+                                    {% if config.alert_on_deleted %}<span class="badge bg-danger">Deleted</span>{% endif %}
+                                    | Min: {{ config.min_classification }}
+                                </small>
+                            </div>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-outline-primary" onclick="editConfig({{ config.id }}, '{{ config.name }}', '{{ config.webhook_url }}', {{ config.is_active|lower }}, {{ config.alert_on_created|lower }}, {{ config.alert_on_modified|lower }}, {{ config.alert_on_deleted|lower }}, '{{ config.min_classification }}')">
+                                    Edit
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteConfig({{ config.id }})">
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="p-4 text-center text-muted">
+                    <p>No webhooks configured yet.</p>
+                    <p class="small">Add a webhook to receive alerts when files change.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">n8n Integration Guide</h5>
+            </div>
+            <div class="card-body">
+                <ol class="mb-0">
+                    <li>Create a new workflow in n8n</li>
+                    <li>Add a "Webhook" trigger node</li>
+                    <li>Copy the Production URL</li>
+                    <li>Paste it in the Webhook URL field above</li>
+                    <li>Add your notification nodes (Telegram, Slack, Email, etc.)</li>
+                    <li>Activate your n8n workflow</li>
+                </ol>
+                <hr>
+                <p class="small text-muted mb-0">
+                    Webhook payload includes: timestamp, event_type, file_path, hash_before, hash_after, 
+                    endpoint, hostname, username, and classification.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.getElementById('webhookForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        
+        fetch('/alerts/config', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Configuration saved successfully!');
+                location.reload();
+            } else {
+                alert('Error: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error saving configuration. Please try again.');
+        });
+    });
+    
+    function editConfig(id, name, url, isActive, onCreated, onModified, onDeleted, minClass) {
+        document.getElementById('configId').value = id;
+        document.getElementById('webhookName').value = name;
+        document.getElementById('webhookUrl').value = url;
+        document.getElementById('isActive').checked = isActive;
+        document.getElementById('alertCreated').checked = onCreated;
+        document.getElementById('alertModified').checked = onModified;
+        document.getElementById('alertDeleted').checked = onDeleted;
+        document.getElementById('minClassification').value = minClass;
+        
+        window.scrollTo(0, 0);
+    }
+    
+    function deleteConfig(id) {
+        if (!confirm('Are you sure you want to delete this webhook configuration?')) {
+            return;
+        }
+        
+        fetch('/alerts/config/' + id, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error deleting configuration. Please try again.');
+        });
+    }
+    
+    function resetForm() {
+        document.getElementById('configId').value = '';
+        document.getElementById('webhookForm').reset();
+    }
+</script>
+{% endblock %}

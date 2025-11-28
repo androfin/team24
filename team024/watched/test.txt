@@ -1,0 +1,3 @@
+This is a test file for File Integrity Monitoring.
+Modify this file to see events in the dashboard.
+Test content Fri Nov 28 09:24:13 PM UTC 2025
